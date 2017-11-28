@@ -20,21 +20,20 @@ package com.mongodb.spark.sql
 import java.util
 import java.util.Comparator
 
-import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe._
-import scala.util.{Failure, Success, Try}
-
+import com.mongodb.client.model.{Aggregates, Filters, Projections, Sorts}
+import com.mongodb.spark.rdd.MongoRDD
+import com.mongodb.spark.rdd.partitioner.MongoSinglePartitioner
+import com.mongodb.spark.sql.types.{BsonCompatibility, ConflictType, SkipFieldType}
+import com.mongodb.spark.{Logging, MongoSpark}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.analysis.TypeCoercion
 import org.apache.spark.sql.catalyst.{JavaTypeInference, ScalaReflection}
 import org.apache.spark.sql.types._
-
 import org.bson._
-import com.mongodb.client.model.{Aggregates, Filters, Projections, Sorts}
-import com.mongodb.spark.{Logging, MongoSpark}
-import com.mongodb.spark.rdd.MongoRDD
-import com.mongodb.spark.rdd.partitioner.MongoSinglePartitioner
-import com.mongodb.spark.sql.types.{BsonCompatibility, ConflictType, SkipFieldType}
+
+import scala.collection.JavaConverters._
+import scala.reflect.runtime.universe._
+import scala.util.{Failure, Success, Try}
 
 object MongoInferSchema extends Logging {
 
@@ -245,7 +244,11 @@ object MongoInferSchema extends Logging {
       case BsonType.DB_POINTER            => BsonCompatibility.DbPointer.structType
       case BsonType.DECIMAL128 =>
         val bigDecimalValue = bsonValue.asDecimal128().decimal128Value().bigDecimalValue()
-        DataTypes.createDecimalType(bigDecimalValue.precision(), bigDecimalValue.scale())
+        if (bigDecimalValue.scale() > bigDecimalValue.precision()) {
+          DataTypes.createDecimalType(bigDecimalValue.scale(), bigDecimalValue.scale())
+        } else {
+          DataTypes.createDecimalType(bigDecimalValue.precision(), bigDecimalValue.scale())
+        }
       case _ => ConflictType
     }
   }
